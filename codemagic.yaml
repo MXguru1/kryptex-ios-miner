@@ -1,0 +1,45 @@
+workflows:
+  unsigned-ipa:
+    name: Unsigned IPA for Sideloadly
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: latest
+      vars:
+        BUNDLE_ID: com.yourname.kryptexminer
+        SCHEME: KryptexMiner
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+      - name: Generate Xcode project
+        script: xcodegen generate
+      - name: Build unsigned device app (arm64)
+        script: |
+          set -euo pipefail
+          xcodebuild build \
+            -project KryptexMiner.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$CM_BUILD_DIR/derived" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID"
+      - name: Package IPA
+        script: |
+          set -euo pipefail
+          APP=$(find "$CM_BUILD_DIR/derived/Build/Products/Release-iphoneos" -maxdepth 1 -name "*.app" | head -n 1)
+          if [ -z "$APP" ]; then
+            echo "No .app found in Release-iphoneos" >&2
+            exit 1
+          fi
+          rm -rf "$CM_BUILD_DIR/ipa"
+          mkdir -p "$CM_BUILD_DIR/ipa/Payload"
+          cp -R "$APP" "$CM_BUILD_DIR/ipa/Payload/"
+          cd "$CM_BUILD_DIR/ipa"
+          zip -qr KryptexMiner-unsigned.ipa Payload
+          unzip -l KryptexMiner-unsigned.ipa
+    artifacts:
+      - $CM_BUILD_DIR/ipa/KryptexMiner-unsigned.ipa
