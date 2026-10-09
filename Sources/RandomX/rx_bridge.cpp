@@ -5,6 +5,25 @@
 #include <cstring>
 #include <vector>
 
+// RandomX's arm64 JIT calls __builtin___clear_cache(), which clang lowers to a call to
+// __clear_cache(). Apple's runtime does not export that symbol, so the link fails with
+// "Undefined symbols for architecture arm64: ___clear_cache". Apple's equivalent is
+// sys_icache_invalidate().
+//
+// Defining it here instead of editing ThirdParty/RandomX keeps the vendored tree
+// byte-identical to its pinned upstream commit. The interpreter never executes
+// JIT-emitted code (kFlags below is RANDOMX_FLAG_DEFAULT), but jit_compiler_a64.o is
+// still linked into the target, so the symbol has to resolve.
+#if defined(__APPLE__) && defined(__aarch64__)
+#include <libkern/OSCacheControl.h>
+
+extern "C" void __clear_cache(void *start, void *end) {
+    const auto bytes =
+        static_cast<size_t>(static_cast<char *>(end) - static_cast<char *>(start));
+    sys_icache_invalidate(start, bytes);
+}
+#endif
+
 struct rx_ctx {
     randomx_cache *cache = nullptr;
     randomx_vm *vm = nullptr;
