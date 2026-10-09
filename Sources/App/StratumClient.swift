@@ -9,6 +9,7 @@ final class StratumClient {
         let blob: String
         let target: String
         let height: Int
+        let seedHash: String
     }
 
     enum Event {
@@ -203,5 +204,6 @@ extension StratumClient.Job {
         self.blob = blob
         self.target = target
         self.height = json["height"] as? Int ?? 0
+        self.seedHash = json["seed_hash"] as? String ?? ""
     }
 }

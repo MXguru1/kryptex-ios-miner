@@ -20,6 +20,8 @@ struct ContentView: View {
                     LabeledContent("State", value: miner.status)
                     LabeledContent("Connected", value: miner.isConnected ? "Yes" : "No")
                     LabeledContent("Last job", value: miner.lastJobId)
+                    LabeledContent("Hashrate", value: String(format: "%.1f H/s", miner.hashrate))
+                    LabeledContent("Shares", value: "\(miner.accepted) ok / \(miner.rejected) rejected")
                 }
 
                 Section {

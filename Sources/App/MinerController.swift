@@ -14,12 +14,34 @@ final class MinerController: ObservableObject {
     @Published private(set) var isConnected = false
     @Published private(set) var isRunning = false
     @Published private(set) var lastJobId = "-"
+    @Published private(set) var hashrate: Double = 0
+    @Published private(set) var accepted = 0
+    @Published private(set) var rejected = 0
     @Published private(set) var log: [String] = []
 
     private let keepAlive = SilentAudioKeepAlive()
-    private let engine = RandomXEngine()
+    private let worker = MiningWorker()
     private lazy var client = StratumClient { [weak self] event in
         self?.handle(event)
+    }
+
+    init() {
+        worker.onShare = { [weak self] jobId, nonce, result in
+            Task { @MainActor in
+                self?.submitShare(jobId: jobId, nonce: nonce, result: result)
+            }
+        }
+        worker.onHashrate = { [weak self] rate in
+            Task { @MainActor in
+                self?.hashrate = rate
+            }
+        }
+        worker.onError = { [weak self] message in
+            Task { @MainActor in
+                self?.status = "Error: \(message)"
+                self?.append("Error: \(message)")
+            }
+        }
     }
 
     func start() {
@@ -39,7 +61,8 @@ final class MinerController: ObservableObject {
         }
 
         isRunning = true
-        status = engine.isLinked ? "Connecting…" : "Connecting (RandomX not linked: no hashing)"
+        status = "Connecting…"
+        worker.start()
         append("Connecting to \(Self.poolHost):\(Self.poolPort)")
         client.start(
             host: Self.poolHost,
@@ -51,10 +74,12 @@ final class MinerController: ObservableObject {
     }
 
     func stop() {
+        worker.stop()
         client.stop()
         keepAlive.stop()
         isRunning = false
         isConnected = false
+        hashrate = 0
         status = "Stopped"
         append("Stopped")
     }
@@ -65,14 +90,25 @@ final class MinerController: ObservableObject {
             append("TCP connected, logging in")
         case .loggedIn(let sessionId):
             isConnected = true
-            status = engine.isLinked ? "Mining" : "Logged in (RandomX not linked: no hashing)"
+            status = "Logged in, waiting for job"
             append("Logged in, session \(sessionId)")
         case .job(let job):
             lastJobId = job.jobId
             append("Job \(job.jobId) height \(job.height)")
-            // TODO: hand the job to the RandomX engine once it is linked.
-        case .submitResult(let accepted, let message):
-            append(accepted ? "Share accepted" : "Share rejected: \(message ?? "unknown")")
+            if let work = MiningWorker.makeWork(from: job) {
+                worker.setWork(work)
+                status = "Mining"
+            } else {
+                append("Job rejected: malformed blob, target or seed_hash")
+            }
+        case .submitResult(let isAccepted, let message):
+            if isAccepted {
+                accepted += 1
+                append("Share accepted (\(accepted))")
+            } else {
+                rejected += 1
+                append("Share rejected: \(message ?? "unknown") (\(rejected))")
+            }
         case .failed(let message):
             isConnected = false
             status = "Error: \(message)"
@@ -81,6 +117,11 @@ final class MinerController: ObservableObject {
                 stop()
             }
         }
+    }
+
+    private func submitShare(jobId: String, nonce: String, result: String) {
+        client.submit(jobId: jobId, nonce: nonce, result: result)
+        append("Share found in job \(jobId), submitting")
     }
 
     private func append(_ line: String) {

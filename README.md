@@ -6,12 +6,21 @@ onto your own iPhone with your Apple developer account, not for the App Store.
 
 ## Status
 
-- Done: Stratum login, job receipt, share submission interface, SwiftUI screen,
-  silent-audio keep-alive, and the GitHub Actions signing and export workflow.
-- **Not done: RandomX hashing.** `Sources/App/RandomXEngine.swift` is a placeholder
-  (`isLinked == false`). The app connects and shows jobs but does not hash, so it
-  earns nothing until a RandomX library for arm64 is linked.
-- Not compiled or tested on a device yet. The code was written on Windows.
+- Done: Stratum login and job receipt, background RandomX mining (`MiningWorker`),
+  share submission, SwiftUI screen, silent-audio keep-alive, and the GitHub Actions
+  signing and export workflow.
+- RandomX is vendored in `ThirdParty/RandomX` (tevador/RandomX v1.2.1, see
+  `UPSTREAM_COMMIT.txt`). It runs in light mode with the interpreter, because iOS
+  does not allow the JIT for sideloaded apps. That is slow. Expect a low hashrate.
+- Verified on Linux x86_64 (`tests/linux/run_tests.sh`, run in Docker with `swift:6.0`):
+  the RandomX upstream known-answer vectors pass through both the C bridge and the
+  Swift wrapper, target parsing passes, and worker shares recompute to the reported
+  hashes.
+- **Not verified:** the iOS arm64 build (needs Xcode), the GitHub Actions run (the
+  workflow file is not pushed yet, because the `gh` token lacks the `workflow` scope),
+  Stratum against the live pool, and anything on a device.
+- The app code was written on Windows. `StratumClient`, `MinerController`, and the
+  SwiftUI and AVFoundation files are not compiled anywhere yet.
 
 ## One-time Apple setup
 
