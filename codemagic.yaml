@@ -6,7 +6,7 @@ workflows:
     environment:
       xcode: latest
       vars:
-        BUNDLE_ID: com.yourname.kryptexminer
+        BUNDLE_ID: com.mxguru1.kryptexminer
         SCHEME: KryptexMiner
     scripts:
       - name: Install XcodeGen

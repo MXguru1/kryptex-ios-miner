@@ -57,6 +57,6 @@ targets:
           - audio
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.yourname.kryptexminer
+        PRODUCT_BUNDLE_IDENTIFIER: com.mxguru1.kryptexminer
         PRODUCT_NAME: KryptexMiner
         TARGETED_DEVICE_FAMILY: "1"

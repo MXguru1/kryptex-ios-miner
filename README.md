@@ -29,7 +29,7 @@ onto your own iPhone with your Apple developer account, not for the App Store.
 
 1. In developer.apple.com, create an App ID that matches `PRODUCT_BUNDLE_IDENTIFIER`
    in `project.yml` and the `BUNDLE_ID` env in `.github/workflows/ios-sideload.yml`.
-   Change both from `com.yourname.kryptexminer`.
+   Change both from `com.mxguru1.kryptexminer`.
 2. Register your iPhone's UDID under Devices.
 3. Create an **Apple Development** certificate. Export it with its private key as a `.p12`.
 4. Create a **Development** provisioning profile for that App ID, your certificate, and your iPhone.
