@@ -1,4 +1,12 @@
+import Combine
 import Foundation
+
+/// One line of the in-app log. The monotonic `id` gives SwiftUI a stable
+/// identity, so appending a line does not rebuild every row in the list.
+struct LogEntry: Identifiable {
+    let id: Int
+    let text: String
+}
 
 @MainActor
 final class MinerController: ObservableObject {
@@ -17,12 +25,15 @@ final class MinerController: ObservableObject {
     @Published private(set) var hashrate: Double = 0
     @Published private(set) var accepted = 0
     @Published private(set) var rejected = 0
-    @Published private(set) var log: [String] = []
+    @Published private(set) var log: [LogEntry] = []
+    private var nextLogId = 0
 
     private let keepAlive = SilentAudioKeepAlive()
     private let worker = MiningWorker()
     private lazy var client = StratumClient { [weak self] event in
-        self?.handle(event)
+        Task { @MainActor in
+            self?.handle(event)
+        }
     }
 
     init() {
@@ -109,6 +120,14 @@ final class MinerController: ObservableObject {
                 rejected += 1
                 append("Share rejected: \(message ?? "unknown") (\(rejected))")
             }
+        case .waiting(let message):
+            // Transient. Keep the current job running and let the connection recover;
+            // this is not a reason to stop mining.
+            if isRunning {
+                isConnected = false
+                status = "Network unavailable, reconnecting…"
+                append("Network unavailable: \(message), retrying")
+            }
         case .failed(let message):
             isConnected = false
             status = "Error: \(message)"
@@ -125,7 +144,8 @@ final class MinerController: ObservableObject {
     }
 
     private func append(_ line: String) {
-        log.append(line)
+        nextLogId += 1
+        log.append(LogEntry(id: nextLogId, text: line))
         if log.count > 200 {
             log.removeFirst(log.count - 200)
         }

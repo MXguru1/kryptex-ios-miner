@@ -17,6 +17,10 @@ final class StratumClient {
         case loggedIn(sessionId: String)
         case job(Job)
         case submitResult(accepted: Bool, message: String?)
+        /// The path went away but the connection is still usable: Network.framework
+        /// holds on to it and resumes when a path appears. Distinct from `failed`,
+        /// which means it has given up for good.
+        case waiting(String)
         case failed(String)
     }
 
@@ -49,6 +53,11 @@ final class StratumClient {
                 self.queue.async {
                     switch state {
                     case .ready:
+                        // A reconnect starts a fresh byte stream, so drop any partial
+                        // line left from the previous one. It would otherwise be
+                        // prefixed onto the first message parsed after recovery and
+                        // break that whole line.
+                        self.buffer = Data()
                         self.report(.connected)
                         self.loginId = self.allocateId()
                         self.send(id: self.loginId, method: "login", params: [
@@ -60,7 +69,11 @@ final class StratumClient {
                     case .failed(let error):
                         self.report(.failed(error.localizedDescription))
                     case .waiting(let error):
-                        self.report(.failed("Network unavailable: \(error.localizedDescription)"))
+                        // Recoverable, not fatal. Reporting this as .failed made
+                        // MinerController tear the session down on a brief blip,
+                        // which also prevented the reconnect that the .ready
+                        // branch above is written to handle.
+                        self.report(.waiting(error.localizedDescription))
                     default:
                         break
                     }

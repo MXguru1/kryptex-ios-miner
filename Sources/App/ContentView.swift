@@ -33,8 +33,8 @@ struct ContentView: View {
                 }
 
                 Section("Log") {
-                    ForEach(Array(miner.log.reversed().enumerated()), id: \.offset) { _, line in
-                        Text(line)
+                    ForEach(miner.log.reversed()) { entry in
+                        Text(entry.text)
                             .font(.caption.monospaced())
                     }
                 }

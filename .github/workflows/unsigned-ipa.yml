@@ -1,0 +1,72 @@
+name: Unsigned IPA (no Apple account needed)
+
+# Ports the `unsigned-ipa` recipe from codemagic.yaml onto GitHub's macOS runners,
+# so the app can be built without a Codemagic account and without any Apple
+# credentials. The result is an *unsigned* arm64 .app packaged as an IPA, which is
+# what Sideloadly expects: it re-signs with your own Apple ID at install time.
+#
+# The signed path (ios-sideload.yml) still needs four repository secrets and a paid
+# developer account. This workflow needs none.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  unsigned-ipa:
+    runs-on: macos-15
+    env:
+      BUNDLE_ID: com.mxguru1.kryptexminer
+      SCHEME: KryptexMiner
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build unsigned device app (arm64)
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project KryptexMiner.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "${{ runner.temp }}/derived" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID"
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          PRODUCTS="${{ runner.temp }}/derived/Build/Products/Release-iphoneos"
+          APP=$(find "$PRODUCTS" -maxdepth 1 -name "*.app" | head -n 1)
+          if [ -z "$APP" ]; then
+            echo "No .app produced in $PRODUCTS -- listing what was built:" >&2
+            find "${{ runner.temp }}/derived/Build/Products" -maxdepth 3 >&2 || true
+            exit 1
+          fi
+          echo "Packaging $APP"
+          rm -rf "${{ runner.temp }}/ipa"
+          mkdir -p "${{ runner.temp }}/ipa/Payload"
+          cp -R "$APP" "${{ runner.temp }}/ipa/Payload/"
+          cd "${{ runner.temp }}/ipa"
+          zip -qr KryptexMiner-unsigned.ipa Payload
+          unzip -l KryptexMiner-unsigned.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: KryptexMiner-unsigned-ipa
+          path: ${{ runner.temp }}/ipa/KryptexMiner-unsigned.ipa
+          if-no-files-found: error
