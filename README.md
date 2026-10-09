@@ -9,6 +9,9 @@ onto your own iPhone with your Apple developer account, not for the App Store.
 - Done: Stratum login and job receipt, background RandomX mining (`MiningWorker`),
   share submission, SwiftUI screen, silent-audio keep-alive, and the GitHub Actions
   signing and export workflow.
+- Measured hashrate: **3.41 H/s**, one thread, light mode, interpreter, on a Docker
+  Linux VM on Windows (`tests/linux/bench.sh`, `-O3`, 1000 hashes, cache init 0.42 s).
+  This is not an iPhone number. Expect the phone to differ, and it's one thread only.
 - RandomX is vendored in `ThirdParty/RandomX` (tevador/RandomX v1.2.1, see
   `UPSTREAM_COMMIT.txt`). It runs in light mode with the interpreter, because iOS
   does not allow the JIT for sideloaded apps. That is slow. Expect a low hashrate.

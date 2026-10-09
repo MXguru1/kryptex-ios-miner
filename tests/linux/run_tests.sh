@@ -5,7 +5,7 @@
 # Run from the repo root with Docker:
 #   docker run --rm -v "$PWD:/work:ro" swift:6.0 bash /work/tests/linux/run_tests.sh
 #
-# This is a Linux x86_64 check. It does not build the iOS target, UIKit/SwiftUI code,
+# This is a Linux check. It does not build the iOS target, UIKit/SwiftUI code,
 # or StratumClient (Network.framework). See README for what remains unverified.
 set -euo pipefail
 
@@ -13,38 +13,9 @@ SRC=/work
 OUT=/tmp/rxtest
 RX="$SRC/ThirdParty/RandomX/src"
 rm -rf "$OUT"
-mkdir -p "$OUT/obj"
+mkdir -p "$OUT"
 
-# Single source of truth: the RandomX C/C++ files listed in project.yml.
-mapfile -t RX_FILES < <(grep -oE 'ThirdParty/RandomX/src/[^ ]+\.(c|cpp)$' "$SRC/project.yml" | sort -u)
-# The JIT is chosen by the host CPU (common.hpp). project.yml lists the arm64 JIT,
-# which is what the iOS build uses. On an x86_64 host, swap in the x86 JIT pair so
-# this check links, as upstream CMake does for x86_64.
-if [[ "$(uname -m)" != "aarch64" ]]; then
-  FILTERED=()
-  for rel in "${RX_FILES[@]}"; do
-    case "$rel" in *a64*) ;; *) FILTERED+=("$rel") ;; esac
-  done
-  FILTERED+=("ThirdParty/RandomX/src/jit_compiler_x86.cpp" "ThirdParty/RandomX/src/jit_compiler_x86_static.S")
-  RX_FILES=("${FILTERED[@]}")
-fi
-echo "RandomX source files built here: ${#RX_FILES[@]}"
-
-OBJS=()
-for rel in "${RX_FILES[@]}"; do
-  f="$SRC/$rel"
-  o="$OUT/obj/$(echo "$rel" | tr '/' '_').o"
-  case "$f" in
-    *.c)   clang -O2 -I"$RX" -c "$f" -o "$o" ;;
-    *.cpp) clang++ -std=c++14 -O2 -I"$RX" -c "$f" -o "$o" ;;
-    *.S)   clang -c "$f" -o "$o" ;;
-  esac
-  OBJS+=("$o")
-done
-
-clang++ -std=c++14 -O2 -I"$RX" -I"$SRC/Sources/RandomX" \
-  -c "$SRC/Sources/RandomX/rx_bridge.cpp" -o "$OUT/obj/rx_bridge.o"
-OBJS+=("$OUT/obj/rx_bridge.o")
+source "$SRC/tests/linux/build_randomx.sh"
 
 echo "== C bridge known-answer test"
 clang++ -std=c++14 -O2 -I"$RX" -I"$SRC/Sources/RandomX" \
